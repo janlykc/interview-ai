@@ -1,6 +1,15 @@
 {
   "folders": [
-    { "name": "Interview Workbench", "path": "." },
-    { "name": "AI Team Harness", "path": "../ai-coding-interview" }
-  ]
+    {
+      "name": "Ai assisted interview",
+      "path": "."
+    },
+    {
+      "name": "AI Team Harness",
+      "path": "../ai-coding-interview"
+    }
+  ],
+  "settings": {
+    "window.title": "${activeEditorShort}${separator}Ai assisted interview"
+  }
 }
