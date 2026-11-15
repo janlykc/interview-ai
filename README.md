@@ -4,6 +4,9 @@ Start each question in the interview repo, with the AI Team Harness alongside it
 in VS Code. The harness provides the pairing and coaching guidance; this repo
 holds the prompt, design notes, implementation, and tests.
 
+For a fresh chat, paste the startup message in [START_HERE.md](START_HERE.md).
+It points the assistant to the local guidance without requiring prior chat history.
+
 You and the lead AI are the core pairing team; the AI Team Harness is your bench.
 Start with whatever the interviewer supplies, even if it is only a verbal prompt
 or starter code. Work through a concrete example and your approach together.
