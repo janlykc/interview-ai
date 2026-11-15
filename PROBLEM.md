@@ -1,3 +1,4 @@
-# Problem
+# Interview question
 
-Paste the supplied prompt, signature, examples and constraints here.
+<!-- Paste the interviewer's prompt here, including supplied signatures,
+examples, constraints, and any rules about tools or AI use. Keep their wording. -->

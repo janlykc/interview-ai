@@ -29,12 +29,12 @@ def main():
                 file=sys.stderr,
             )
             return 1
-        git("rev-parse", "--verify", "interview-starter^{commit}")
-        git("switch", "-c", branch, "interview-starter")
+        git("rev-parse", "--verify", "refs/heads/main^{commit}")
+        git("switch", "-c", branch, "refs/heads/main")
     except subprocess.CalledProcessError as error:
         print(error.stderr.strip(), file=sys.stderr)
         return 1
-    print(f"Ready on {branch}. Paste the prompt, starter and examples, then commit the import.")
+    print(f"Ready on {branch}. Paste the question into PROBLEM.md. Use design/ if helpful.")
     return 0
 
 

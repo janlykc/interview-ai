@@ -15,6 +15,12 @@ optional: when requested, read its `ai_team/coach/AGENTS.md` and give feedback a
 checkpoints, distinguishing human, joint and AI contributions. No automatic
 delegation, evaluation, session paperwork or solution generation is required.
 
+Read PROBLEM.md first. When time allows, capture the agreed behavior and examples
+in design/spec.md, then use design/outline.md to choose a small implementation
+checkpoint and a way to verify it. Mark open assumptions as such. In a short round,
+a concrete example and a sketch in chat or code are enough. Follow the human's
+instruction to discuss or implement; the templates do not require a sign-off.
+
 Use the interviewer's supplied constraints and AI-use rules when available.
 Keep imported starter files and tests intact unless a correction is agreed.
 After importing a question, offer a local baseline commit before solution edits.
@@ -24,6 +30,6 @@ Run: `.venv/bin/python solution.py`
 Tests: `.venv/bin/python -m unittest discover -s tests -v`
 Fresh branch: `.venv/bin/python scripts/new_question.py arrays-01`
 
-`interview-starter` is the blank baseline tag. Do not reset, clean or overwrite
+`main` is the reusable blank baseline. Do not reset, clean or overwrite
 existing work to start a new question. Commit or explicitly stash current edits
 first. No remote, push, deployment or external service is configured.
