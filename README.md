@@ -4,6 +4,16 @@ Start each question in the interview repo, with the AI Team Harness alongside it
 in VS Code. The harness provides the pairing and coaching guidance; this repo
 holds the prompt, design notes, implementation, and tests.
 
+You and the lead AI are the core pairing team; the AI Team Harness is your bench.
+Start with whatever the interviewer supplies, even if it is only a verbal prompt
+or starter code. Work through a concrete example and your approach together.
+Design, debugging, meaningful testing and a review of code quality belong in the
+normal pairing loop. Ask “review this”, “help me debug”, “challenge my design”, or
+“give me coaching feedback” to draw on the relevant harness guidance. Separate
+agents are used only when you explicitly ask and the interviewer's rules allow
+them. Documents and harness workflows should help progress, not become setup
+requirements. The steps below are available conveniences, not entry gates.
+
 1. **Start clean.** From a clean checkout, use **Terminal → Run Task → Interview:
    New question branch**, or run `.venv/bin/python scripts/new_question.py round-01`.
    This creates `question/round-01` from the current local `main`; existing branches

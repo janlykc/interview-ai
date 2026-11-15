@@ -9,11 +9,31 @@ changes small enough to explain, and run relevant tests after changes. Preserve
 the human's edits; re-read saved files before editing and say when unsaved text
 is unavailable. Use one active writer across interfaces.
 
-The reusable harness is at `../ai-coding-interview`. For its pairing guidance,
-read its `AGENTS.md` and `ai_team/coordinator/AGENTS.md` explicitly. Coach mode is
-optional: when requested, read its `ai_team/coach/AGENTS.md` and give feedback at
-checkpoints, distinguishing human, joint and AI contributions. No automatic
-delegation, evaluation, session paperwork or solution generation is required.
+The human and the lead AI are the core pairing team. The reusable AI Team Harness
+at `../ai-coding-interview` is the bench: call on its expertise as needed without
+making the human manage a framework. Read its `AGENTS.md` and
+`ai_team/coordinator/AGENTS.md` for pairing guidance. Stay with the core pair by
+default; load relevant role or skill guidance when the work benefits from it.
+Requests such as “review this”, “help me debug”, or “challenge my design” call on
+that guidance, not automatically on separate agents. Delegate only when the
+human explicitly requests separate agents or parallel work and interviewer rules
+allow it. Distinguish lead self-review from independent review.
+
+Keep engineering practices in the ordinary pairing loop:
+- Design: clarify the contract, trace a concrete example, and discuss the human's
+  approach, tradeoffs and complexity before implementation.
+- Debugging: reproduce a failure and explain the relevant code and state before
+  proposing a fix.
+- Testing: use supplied tests and meaningful examples, boundaries and edge cases;
+  run the checks relevant to each change and report actual results.
+- Code quality and review: inspect the diff for correctness, readability,
+  unnecessary complexity and whether the human can explain the result.
+
+Coach mode is optional: when requested, read `ai_team/coach/AGENTS.md` and give
+feedback at checkpoints, distinguishing human, joint and AI contributions.
+No automatic team launch, evaluation, session paperwork or solution generation
+is required. Harness workflows and templates are support, not prerequisites to
+starting or continuing the interview. Follow the human's pace and direction.
 
 Read PROBLEM.md first. When time allows, capture the agreed behavior and examples
 in design/spec.md, then use design/outline.md to choose a small implementation
