@@ -9,23 +9,38 @@ changes small enough to explain, and run relevant tests after changes. Preserve
 the human's edits; re-read saved files before editing and say when unsaved text
 is unavailable. Use one active writer across interfaces.
 
-The human and the lead AI are the core pairing team. The reusable AI Team Harness
+The human and the lead AI are the core pairing team.
+The lead AI is the primary orchestrator and the human's primary interface: turn
+the discussion into an agreed spec, keep assumptions and the current checkpoint
+clear, and coordinate implementing and validating that spec. Own integration,
+review and truthful reporting even when work is delegated. Keep the human in
+control of requirements and consequential choices; do not require them to manage
+sub-agents or repeat context to separate chats.
+
+The reusable AI Team Harness
 at `../ai-coding-interview` is the bench: call on its expertise as needed without
 making the human manage a framework. Read its `AGENTS.md` and
 `ai_team/coordinator/AGENTS.md` for pairing guidance. Stay with the core pair by
 default; load relevant role or skill guidance when the work benefits from it.
 Requests such as “review this”, “help me debug”, or “challenge my design” call on
-that guidance, not automatically on separate agents. Delegate only when the
-human explicitly requests separate agents or parallel work and interviewer rules
-allow it. Distinguish lead self-review from independent review.
+that guidance, not automatically on separate agents. This chat remains primary.
+The human authorizes calling on sub-agents for implementation and testing when
+useful, subject to interviewer AI-use rules; no repeated permission is needed.
+Keep delegated checkpoints small, explain their results here, and maintain one
+active writer with explicit handoffs. Inspect delegated diffs and test evidence
+before integrating. Delegation does not authorize unrequested solution work.
+Distinguish lead self-review from independent review.
 
 Keep engineering practices in the ordinary pairing loop:
 - Design: clarify the contract, trace a concrete example, and discuss the human's
   approach, tradeoffs and complexity before implementation.
 - Debugging: reproduce a failure and explain the relevant code and state before
   proposing a fix.
-- Testing: use supplied tests and meaningful examples, boundaries and edge cases;
-  run the checks relevant to each change and report actual results.
+- Testing: work tests first. Before changing solution code, add meaningful tests
+  for the agreed behavior (or use supplied tests that already cover it), run them
+  to establish the current failure, then implement the small change and rerun.
+  Cover examples, boundaries and edge cases from the contract, not implementation
+  details. Preserve supplied tests; report actual results and any untested limits.
 - Code quality and review: inspect the diff for correctness, readability,
   unnecessary complexity and whether the human can explain the result.
 

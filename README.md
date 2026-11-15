@@ -12,9 +12,11 @@ Start with whatever the interviewer supplies, even if it is only a verbal prompt
 or starter code. Work through a concrete example and your approach together.
 Design, debugging, meaningful testing and a review of code quality belong in the
 normal pairing loop. Ask “review this”, “help me debug”, “challenge my design”, or
-“give me coaching feedback” to draw on the relevant harness guidance. Separate
-agents are used only when you explicitly ask and the interviewer's rules allow
-them. Documents and harness workflows should help progress, not become setup
+“give me coaching feedback” to draw on the relevant harness guidance. This chat
+stays primary; sub-agents may help with implementation and testing when useful
+and permitted by interviewer rules, with one active writer. Use meaningful new
+or supplied tests to establish behavior before changing solution code, then
+implement and rerun. Documents and harness workflows should help progress, not become setup
 requirements. The steps below are available conveniences, not entry gates.
 
 1. **Start clean.** From a clean checkout, use **Terminal → Run Task → Interview:
