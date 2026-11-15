@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Interview: Tests",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "unittest", "discover", "-s", "tests", "-v"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Interview: Run solution",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["solution.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Interview: New question branch",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["scripts/new_question.py", "${input:questionName}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "questionName",
+      "type": "promptString",
+      "description": "Fresh question name (commit current work first)",
+      "default": "arrays-01"
+    }
+  ]
+}

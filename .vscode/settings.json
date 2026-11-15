@@ -1,0 +1,16 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.testing.unittestEnabled": true,
+  "python.testing.pytestEnabled": false,
+  "python.testing.unittestArgs": ["-v", "-s", "tests", "-p", "test_*.py"],
+  "editor.formatOnSave": false,
+  "editor.wordWrap": "on",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "workbench.startupEditor": "none",
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.venv": true,
+    "**/.pytest_cache": true
+  }
+}
