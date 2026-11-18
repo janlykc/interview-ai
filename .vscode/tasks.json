@@ -12,30 +12,16 @@
       "problemMatcher": []
     },
     {
-      "label": "Interview: Run solution",
+      "label": "Webhook: Run Flask ingress",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
-      "args": ["solution.py"],
-      "options": { "cwd": "${workspaceFolder}" },
+      "args": ["-m", "flask", "--app", "app", "run", "--port", "8080"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": { "WEBHOOK_INGRESS_TOKEN": "local-interview-token" }
+      },
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
       "problemMatcher": []
-    },
-    {
-      "label": "Interview: New question branch",
-      "type": "process",
-      "command": "${workspaceFolder}/.venv/bin/python",
-      "args": ["scripts/new_question.py", "${input:questionName}"],
-      "options": { "cwd": "${workspaceFolder}" },
-      "presentation": { "reveal": "always", "panel": "dedicated" },
-      "problemMatcher": []
-    }
-  ],
-  "inputs": [
-    {
-      "id": "questionName",
-      "type": "promptString",
-      "description": "Fresh question name (commit current work first)",
-      "default": "arrays-01"
     }
   ]
 }

@@ -1,49 +1,95 @@
-# Ai assisted interview
+# Auger webhook delivery
 
-Start each question in the interview repo, with the AI Team Harness alongside it
-in VS Code. The harness provides the pairing and coaching guidance; this repo
-holds the prompt, design notes, implementation, and tests.
+For the provided interview environment, [INTERVIEW_PROMPTS.md](INTERVIEW_PROMPTS.md)
+contains copy/paste pairing prompts, the compact design, and one prompt per feature.
+The full [design](design/spec.md) and [component view](design/component-architecture.svg)
+are its companions. The prompt guide works without the local agent harness.
 
-For a fresh chat, paste the startup message in [START_HERE.md](START_HERE.md).
-It points the assistant to the local guidance without requiring prior chat history.
+Current checkpoint: Flask ingress and atomic SQLite acceptance are implemented;
+Pub/Sub publication, HTTP dispatch, and DLQ handling remain planned. The original
+interview handout is kept locally and excluded from this public repository.
 
-You and the lead AI are the core pairing team; the AI Team Harness is your bench.
-Start with whatever the interviewer supplies, even if it is only a verbal prompt
-or starter code. Work through a concrete example and your approach together.
-Design, debugging, meaningful testing and a review of code quality belong in the
-normal pairing loop. Ask “review this”, “help me debug”, “challenge my design”, or
-“give me coaching feedback” to draw on the relevant harness guidance. This chat
-stays primary; sub-agents may help with implementation and testing when useful
-and permitted by interviewer rules, with one active writer. Use meaningful new
-or supplied tests to establish behavior before changing solution code, then
-implement and rerun. Documents and harness workflows should help progress, not become setup
-requirements. The steps below are available conveniences, not entry gates.
+## Retrieve this checkpoint
 
-1. **Start clean.** From a clean checkout, use **Terminal → Run Task → Interview:
-   New question branch**, or run `.venv/bin/python scripts/new_question.py round-01`.
-   This creates `question/round-01` from the current local `main`; existing branches
-   and uncommitted work are protected. Keep `main` for reusable setup.
-2. **Capture the question.** Paste it into [PROBLEM.md](PROBLEM.md). Add supplied
-   starter files and tests as given. If useful, commit the import before editing
-   the solution so you can review the delta.
-3. **Design if time allows.** Capture the input/output contract and one or two
-   examples in [design/spec.md](design/spec.md). Sketch the approach and first
-   testable checkpoint in [design/outline.md](design/outline.md). For a short
-   round, say the example and the approach aloud, or sketch them in code.
-4. **Implement and verify.** Put a standalone answer in [solution.py](solution.py)
-   and examples in [tests/test_solution.py](tests/test_solution.py). Press
-   **Cmd+Shift+B** for tests. Use **Interview: Run solution** under Terminal →
-   Run Task, or select **Interview: Debug solution** / **Interview: Debug tests**
-   in Run and Debug and press **F5**. Set a breakpoint on an executable line.
-   The initial example is skipped until you replace it with a real test.
+```sh
+git clone --branch question/auger-webhook-delivery --single-branch https://github.com/janlykc/interview-ai.git auger-webhooks
+cd auger-webhooks
+python3 -m venv .venv
+```
 
-If given a full project, follow its structure and test commands rather than
-flattening it into the template. The Python scaffold needs no third-party
-packages. To recreate the environment, run `python3 -m venv .venv` here.
+For preparation notes, open `INTERVIEW_PROMPTS.md` and `design/spec.md`. To run the
+implemented ingress feature, follow the commands below. No Google credentials or
+Pub/Sub emulator are required for this checkpoint.
 
-For pairing, say: “Read PROBLEM.md and my design notes if I’ve filled them in.
-Use my examples and pseudocode. Discuss the approach with me and implement
-when I ask. Use coach mode only when I ask for feedback.”
+## Auger: running the ingress checkpoint
 
-`practice/delivery-grid` is the onboarding rehearsal. Commit your work before
-switching back with `git switch main`. All branches are local.
+Use Python 3.12. From this worktree, install Flask and start the local server
+(the token below is for the local demo):
+
+```sh
+.venv/bin/python -m pip install -r requirements.txt
+export WEBHOOK_INGRESS_TOKEN=local-interview-token
+.venv/bin/flask --app app run --port 8080
+```
+
+The server listens on `127.0.0.1:8080` and stores data in `var/webhooks.db`.
+Override the port with `--port` and the database with `WEBHOOK_DB_PATH`.
+The token authorizes only C1 by default; `WEBHOOK_CUSTOMER_ID` changes both that
+binding and the seeded policy customer.
+This is local demo authentication; production producer identity and TLS are deferred.
+
+In another terminal, send the supplied event:
+
+```sh
+curl -i http://127.0.0.1:8080/events \
+  -H 'Authorization: Bearer local-interview-token' \
+  -H 'Content-Type: application/json' \
+  --data-binary @examples/event.json
+```
+
+Expect `202` and two delivery IDs. Sending the identical event again returns the
+same IDs. Changing its contents while retaining its customer/event ID returns
+`409`. Input is restricted to the documented fields and a 256 KiB request limit.
+
+Inspect the three tables:
+
+```sh
+sqlite3 -header -column var/webhooks.db '
+  SELECT event_id, customer_id, routing_status FROM events;
+  SELECT delivery_id, endpoint_id, status, attempt_count FROM deliveries;
+  SELECT delivery_id, next_publish_at, published_at FROM outbox;
+'
+```
+
+The first request atomically creates one event, two `pending` deliveries, and two
+outbox rows with `next_publish_at` equal to acceptance time and `published_at` null.
+Database timestamps are UTC Unix milliseconds. The seeded routing for
+`C1 + billing.invoice_paid` selects A and B. Other event types have a valid empty
+routing result and are accepted as `no_targets`. Destinations are example HTTPS
+URLs, and queued messages contain secret references, never signing keys.
+
+Run the ingress and Flask API tests:
+
+```sh
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+This checkpoint ends at durable ingress acceptance. The Pub/Sub publisher,
+delivery worker, attempt-history table, and DLQ handler come in later checkpoints.
+The full design also describes delivery state and lease fields that will be added
+with the worker; the current executable schema is in
+`webhook_service/adapters/schema.sql`.
+
+## Code layout
+
+- `app.py`: Flask application factory, event route, and JSON error responses.
+- `webhook_service/ingress.py`: validation, destination resolution, and acceptance.
+- `webhook_service/models.py`: event and delivery contracts.
+- `webhook_service/ports.py`: repository and resolver interfaces.
+- `webhook_service/adapters/`: SQLite persistence, SQL schema, and seeded routing.
+- `tests/`: acceptance, failure, concurrency, and Flask API tests.
+
+VS Code provides **Webhook: Run Flask ingress**, **Webhook: Debug Flask ingress**,
+and **Interview: Tests**. The run and debug entries set the local demo token.
+The application runs without the AI Team Harness or agent instruction files.
+The original prompt is in `PROBLEM.md`; agreed behavior is in `design/`.

@@ -2,11 +2,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Interview: Debug solution",
+      "name": "Webhook: Debug Flask ingress",
       "type": "debugpy",
       "request": "launch",
       "python": "${workspaceFolder}/.venv/bin/python",
-      "program": "${workspaceFolder}/solution.py",
+      "module": "flask",
+      "args": ["--app", "app", "run", "--port", "8080", "--no-reload"],
+      "env": { "WEBHOOK_INGRESS_TOKEN": "local-interview-token" },
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": true

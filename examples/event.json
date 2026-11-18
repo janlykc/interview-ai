@@ -1,0 +1,9 @@
+{
+  "event_id": "E1",
+  "customer_id": "C1",
+  "category": "billing",
+  "event_type": "invoice_paid",
+  "schema_version": 1,
+  "occurred_at": "2026-11-17T17:00:00Z",
+  "payload": {"invoice_id": "INV-42"}
+}

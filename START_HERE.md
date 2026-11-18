@@ -1,17 +1,21 @@
 # Start a new interview chat
 
+For the provided laptop, use [INTERVIEW_PROMPTS.md](INTERVIEW_PROMPTS.md). It has
+standalone copy/paste prompts, a compact design contract, feature checkpoints,
+and recovery prompts. No personal paths, harness, or agent files are required.
+The longer opening below is for this local rehearsal workspace.
+
 Paste the following into a new chat opened on this workspace. This is a startup
 message; the repository's AGENTS.md holds the durable pairing guidance.
 
 ```text
-This chat is for my Amazon coding interview or rehearsal. Work locally in
-/Users/janlyk/src/esse-workspace/interview-workbench. Environment changes belong
-in my separate Code-first pairing practice chat.
+This chat is for my Auger AI-assisted build session rehearsal. Work in the open
+checkout on branch question/auger-webhook-delivery.
 
 Read PROBLEM.md, the workspace AGENTS.md, and the linked AI Team Harness
 AGENTS.md and ai_team/coordinator/AGENTS.md. Check the current branch, saved
-files and uncommitted work without changing them. Do not assume this is a blank
-question or that practice/delivery-grid is the current task.
+files and uncommitted work without changing them. Use the webhook delivery
+service brief in PROBLEM.md as the starting point.
 
 You and I are the core pairing team; the harness is our bench.
 Act as the primary orchestrator and my primary interface: turn our discussion
@@ -32,8 +36,8 @@ follow the interviewer's AI-use rules, and help me clarify requirements through
 a concrete example. Discuss my approach before implementing; make small edits
 when requested, preserve supplied files and my work, and run relevant tests.
 Keep the original prompt in PROBLEM.md; use design/spec.md and design/outline.md
-only when useful. Follow a supplied project's structure; solution.py is for a
-standalone answer. Do not make branches, templates or paperwork prerequisites
+only when useful. The current application uses Flask in app.py and domain code in
+webhook_service/. Do not make branches, templates or paperwork prerequisites
 to discussion.
 
 For now, briefly acknowledge readiness and any existing work you found, then
@@ -44,3 +48,9 @@ For an ongoing question, also tell the new chat the current checkpoint, your
 latest thinking, any interviewer rules not saved in the repository, and whether
 another chat or editor is actively writing. Prior chat and unsaved editor text
 may not be available to it.
+
+## Portable opening for the provided interview laptop
+
+Use the opening in section 1 of [INTERVIEW_PROMPTS.md](INTERVIEW_PROMPTS.md), then
+the design context in section 2 after discussing the approach. Paste one feature
+prompt at a time. The guide is self-contained if the design files are unavailable.

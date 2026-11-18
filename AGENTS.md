@@ -19,8 +19,10 @@ sub-agents or repeat context to separate chats.
 
 The reusable AI Team Harness
 at `../ai-coding-interview` is the bench: call on its expertise as needed without
-making the human manage a framework. Read its `AGENTS.md` and
-`ai_team/coordinator/AGENTS.md` for pairing guidance. Stay with the core pair by
+making the human manage a framework. When available, read its `AGENTS.md` and
+`ai_team/coordinator/AGENTS.md` for pairing guidance. If the harness is absent,
+continue with this file and `INTERVIEW_PROMPTS.md`; do not require installing it.
+Stay with the core pair by
 default; load relevant role or skill guidance when the work benefits from it.
 Requests such as “review this”, “help me debug”, or “challenge my design” call on
 that guidance, not automatically on separate agents. This chat remains primary.
@@ -59,12 +61,18 @@ instruction to discuss or implement; the templates do not require a sign-off.
 Use the interviewer's supplied constraints and AI-use rules when available.
 Keep imported starter files and tests intact unless a correction is agreed.
 After importing a question, offer a local baseline commit before solution edits.
-Report tests actually run; the initial skipped example proves no solution behavior.
+Report tests actually run and distinguish them from planned checks.
 
-Run: `.venv/bin/python solution.py`
+Install: `.venv/bin/python -m pip install -r requirements.txt`
+Run: set `WEBHOOK_INGRESS_TOKEN`, then `.venv/bin/flask --app app run --port 8080`
 Tests: `.venv/bin/python -m unittest discover -s tests -v`
-Fresh branch: `.venv/bin/python scripts/new_question.py arrays-01`
+
+This Auger branch is an application: `app.py` is the Flask boundary and
+`webhook_service/` contains ingress, routing, and SQLite persistence. The reusable
+solution placeholder and new-question scripts were removed for this exercise.
 
 `main` is the reusable blank baseline. Do not reset, clean or overwrite
 existing work to start a new question. Commit or explicitly stash current edits
-first. No remote, push, deployment or external service is configured.
+first. The public origin is `janlykc/interview-ai`. Commit and push only when
+requested; deployment is a separate action. Keep `private/`, local databases,
+credentials, and the supplied interview handout out of published changes.

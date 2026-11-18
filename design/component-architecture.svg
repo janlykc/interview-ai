@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="735" viewBox="0 0 1600 735" role="img" aria-labelledby="title desc">
+<title id="title">Webhook delivery from left to right</title>
+<desc id="desc">Callers submit events to the leftmost service, Flask ingress. Ingress looks up a policy database and atomically commits events, pending deliveries, and outbox rows in SQLite. A periodic outbox publisher reads due rows and publishes one message per delivery to Google Pub/Sub. A shared subscription distributes messages among multiple dispatch workers, which sign each attempt and POST to customer endpoints. Pub/Sub retries unresolved messages and forwards exhausted work to a dead-letter topic and failure recorder. Workers and the failure recorder update delivery outcomes. Ingress and SQLite are implemented; policy is seeded; publishing, dispatch, and dead-letter processing are planned.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#385675"/></marker>
+  <marker id="state-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#13786d"/></marker>
+  <style>
+    text{font-family:Arial,Helvetica,sans-serif;fill:#172e45}
+    .title{font-size:25px;font-weight:700}.head{font-size:20px;font-weight:700}
+    .body{font-size:16px}.small{font-size:14px}.edge{font-size:14px;font-weight:600;fill:#385675}
+    .line{fill:none;stroke:#385675;stroke-width:2;stroke-linejoin:round;marker-end:url(#arrow)}
+    .bus{fill:none;stroke:#385675;stroke-width:2;stroke-linejoin:round}
+    .state{fill:none;stroke:#13786d;stroke-width:2;stroke-dasharray:6 4;stroke-linejoin:round}
+    .built{fill:#e8efff;stroke:#6b89b9;stroke-width:1.5}
+    .planned{fill:#fff;stroke:#889eb5;stroke-width:1.5}
+  </style>
+</defs>
+<rect width="1600" height="735" fill="#fff"/>
+<text x="20" y="38" class="title">Webhook delivery</text>
+<text x="20" y="66" class="body">Durable acceptance → queue publication → parallel HTTP dispatch</text>
+
+<!-- Policy is a read-only configuration dependency, represented as a database. -->
+<path d="M140 113 V183 C140 204 325 204 325 183 V113 Z" class="built"/>
+<ellipse cx="232.5" cy="113" rx="92.5" ry="16" class="built"/>
+<text x="232.5" y="151" class="head" text-anchor="middle">Policy database</text>
+<text x="232.5" y="177" class="small" text-anchor="middle">URLs + secret references</text>
+<path d="M232 201 V285" class="line"/>
+<text x="245" y="248" class="edge">Lookup</text>
+
+<!-- The main delivery pipeline reads left to right. -->
+<text x="20" y="328" class="head">Callers</text>
+<text x="20" y="353" class="small">Events</text>
+<path d="M105 340 H140" class="line"/>
+
+<rect x="140" y="285" width="185" height="110" rx="10" class="built"/>
+<text x="158" y="318" class="head">Ingress service</text>
+<text x="158" y="346" class="small">Flask · POST /events</text>
+<text x="158" y="372" class="small">Validate + deduplicate</text>
+
+<path d="M325 340 H385" class="line"/>
+<text x="355" y="325" class="edge" text-anchor="middle">Commit</text>
+<path d="M385 286 V399 C385 420 575 420 575 399 V286 Z" class="built"/>
+<ellipse cx="480" cy="286" rx="95" ry="16" class="built"/>
+<text x="480" y="328" class="head" text-anchor="middle">SQLite</text>
+<text x="480" y="356" class="body" text-anchor="middle">events · deliveries</text>
+<text x="480" y="382" class="body" text-anchor="middle">outbox</text>
+<text x="480" y="447" class="small" text-anchor="middle">One atomic transaction</text>
+<text x="480" y="470" class="small" text-anchor="middle">202 only after commit</text>
+
+<path d="M575 340 H635" class="line"/>
+<text x="605" y="325" class="edge" text-anchor="middle">Read due</text>
+<rect x="635" y="285" width="170" height="110" rx="10" class="planned"/>
+<text x="650" y="318" class="body" font-weight="700">Outbox publisher</text>
+<text x="650" y="346" class="small">Publish each delivery</text>
+<text x="650" y="372" class="small">Then mark published</text>
+<text x="720" y="432" class="small" text-anchor="middle">Periodic process</text>
+<text x="720" y="455" class="small" text-anchor="middle">Retries broker publication</text>
+
+<path d="M805 340 H865" class="line"/>
+<text x="835" y="325" class="edge" text-anchor="middle">Publish</text>
+
+<!-- A message queue symbol, not another service box. -->
+<text x="965" y="286" class="head" text-anchor="middle">Google Pub/Sub</text>
+<rect x="865" y="310" width="200" height="60" rx="12" fill="#eef3f8" stroke="#6b89b9" stroke-width="2"/>
+<rect x="879" y="322" width="22" height="36" rx="3" fill="#cad9f2"/>
+<rect x="910" y="322" width="22" height="36" rx="3" fill="#cad9f2"/>
+<rect x="941" y="322" width="22" height="36" rx="3" fill="#cad9f2"/>
+<rect x="972" y="322" width="22" height="36" rx="3" fill="#cad9f2"/>
+<rect x="1003" y="322" width="22" height="36" rx="3" fill="#cad9f2"/>
+<text x="965" y="398" class="small" text-anchor="middle">One message per delivery</text>
+<path d="M1035 370 V450 H895 V370" class="line"/>
+<text x="965" y="480" class="small" text-anchor="middle">Broker retries unresolved work</text>
+
+<!-- One subscription distributes messages to the available worker instances. -->
+<path d="M1065 340 H1105 M1105 252 V452" class="bus"/>
+<path d="M1105 252 H1145" class="line"/>
+<path d="M1105 352 H1145" class="line"/>
+<path d="M1105 452 H1145" class="line"/>
+<text x="1100" y="324" class="edge" text-anchor="middle">Deliver</text>
+<text x="1230" y="180" class="head" text-anchor="middle">Dispatch workers</text>
+<rect x="1145" y="215" width="170" height="75" rx="9" class="planned"/>
+<text x="1230" y="246" class="head" text-anchor="middle">Worker 1</text>
+<text x="1230" y="271" class="body" text-anchor="middle">Sign + POST</text>
+<rect x="1145" y="315" width="170" height="75" rx="9" class="planned"/>
+<text x="1230" y="346" class="head" text-anchor="middle">Worker 2</text>
+<text x="1230" y="371" class="body" text-anchor="middle">Sign + POST</text>
+<rect x="1145" y="415" width="170" height="75" rx="9" class="planned"/>
+<text x="1230" y="446" class="head" text-anchor="middle">Worker N</text>
+<text x="1230" y="471" class="body" text-anchor="middle">Sign + POST</text>
+<text x="1230" y="520" class="small" text-anchor="middle">Shared subscription</text>
+<text x="1230" y="542" class="small" text-anchor="middle">Fresh HMAC each attempt</text>
+
+<!-- Worker instances are not permanently assigned to a customer endpoint. -->
+<rect x="1400" y="205" width="190" height="300" rx="12" fill="#fff8f1" stroke="#b66629" stroke-width="1.5" stroke-dasharray="6 4"/>
+<path d="M1315 252 H1365 M1315 352 H1365 M1315 452 H1365 M1365 252 V452" class="bus"/>
+<path d="M1365 285 H1420" class="line"/>
+<path d="M1365 440 H1420" class="line"/>
+<text x="1495" y="180" class="head" text-anchor="middle">Customer endpoints</text>
+<rect x="1420" y="245" width="150" height="80" rx="9" class="planned"/>
+<text x="1495" y="278" class="head" text-anchor="middle">Endpoint A</text>
+<text x="1495" y="304" class="small" text-anchor="middle">Verify signature</text>
+<rect x="1420" y="400" width="150" height="80" rx="9" class="planned"/>
+<text x="1495" y="433" class="head" text-anchor="middle">Endpoint B</text>
+<text x="1495" y="459" class="small" text-anchor="middle">Verify signature</text>
+<text x="1495" y="365" class="small" text-anchor="middle">Customer controlled</text>
+
+<!-- Exhausted messages use a separate dead-letter subscription. -->
+<path d="M1065 360 H1080 V520 H875 V602 H900" class="line"/>
+<text x="890" y="546" class="edge">Exhausted</text>
+<text x="990" y="565" class="body" text-anchor="middle" font-weight="700">Dead-letter topic</text>
+<rect x="900" y="580" width="180" height="45" rx="10" fill="#eef3f8" stroke="#889eb5" stroke-width="1.5"/>
+<rect x="914" y="591" width="20" height="23" rx="3" fill="#cad9f2"/>
+<rect x="944" y="591" width="20" height="23" rx="3" fill="#cad9f2"/>
+<rect x="974" y="591" width="20" height="23" rx="3" fill="#cad9f2"/>
+<rect x="1004" y="591" width="20" height="23" rx="3" fill="#cad9f2"/>
+<path d="M1080 602 H1145" class="line"/>
+<rect x="1145" y="555" width="170" height="75" rx="9" class="planned"/>
+<text x="1230" y="585" class="head" text-anchor="middle">DLQ handler</text>
+<text x="1230" y="612" class="body" text-anchor="middle">Record failure</text>
+
+<!-- Persistence is a secondary connection, distinct from the main flow. -->
+<path d="M1230 490 V500 H1340 V680 H365 V385 H385" class="state" marker-end="url(#state-arrow)"/>
+<path d="M1315 602 H1340" class="state"/>
+<circle cx="1340" cy="602" r="3" fill="#13786d"/>
+<text x="780" y="671" class="small" fill="#126a62" text-anchor="middle">Workers and DLQ handler update delivery outcomes</text>
+<text x="20" y="720" class="small">Blue: implemented / seeded. Other components: planned. Policy CRUD remains out of scope.</text>
+</svg>
