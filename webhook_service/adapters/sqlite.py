@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
 
-from ..models import Acceptance, EventConflict, StorageUnavailable, encode_json, fingerprint
+from ..models import Acceptance, EventConflict, OutboxEntry, StorageUnavailable, encode_json, fingerprint
 
 
 class SQLiteRepository:
@@ -54,6 +54,31 @@ class SQLiteRepository:
             result = self._find(db, event)
             db.commit()
             return result
+
+    def list_due_outbox(self, now_ms, limit=100):
+        if limit < 1:
+            raise ValueError("Batch limit must be positive")
+        with self._connection() as db:
+            rows = db.execute("""
+                SELECT delivery_id, message_json, next_publish_at, published_at
+                FROM outbox WHERE published_at IS NULL AND next_publish_at <= ?
+                ORDER BY next_publish_at, delivery_id LIMIT ?
+            """, (now_ms, limit)).fetchall()
+            return [OutboxEntry(**dict(row)) for row in rows]
+
+    def mark_published(self, delivery_id, published_at):
+        with self._connection() as db:
+            db.execute("""
+                UPDATE outbox SET published_at = ?
+                WHERE delivery_id = ? AND published_at IS NULL
+            """, (published_at, delivery_id))
+
+    def schedule_publish_retry(self, delivery_id, next_publish_at):
+        with self._connection() as db:
+            db.execute("""
+                UPDATE outbox SET next_publish_at = ?
+                WHERE delivery_id = ? AND published_at IS NULL
+            """, (next_publish_at, delivery_id))
 
     def accept_event_with_deliveries(self, event, routing, deliveries, now_ms):
         with self._connection() as db:

@@ -9,6 +9,13 @@ changes small enough to explain, and run relevant tests after changes. Preserve
 the human's edits; re-read saved files before editing and say when unsaved text
 is unavailable. Use one active writer across interfaces.
 
+The current pairing preference is checkpoint-sized implementation followed by a
+joint code walkthrough, quality review, and stress-test discussion. Pause further
+implementation after each checkpoint. Walk the actual call chain in small sections,
+give the human time to inspect it, distinguish tested failures from proposed stress
+cases, and discuss findings before fixing them. Wait for the human to select the
+next implementation checkpoint; do not require a pause after every function.
+
 The human and the lead AI are the core pairing team.
 The lead AI is the primary orchestrator and the human's primary interface: turn
 the discussion into an agreed spec, keep assumptions and the current checkpoint
@@ -66,6 +73,9 @@ Report tests actually run and distinguish them from planned checks.
 Install: `.venv/bin/python -m pip install -r requirements.txt`
 Run: set `WEBHOOK_INGRESS_TOKEN`, then `.venv/bin/flask --app app run --port 8080`
 Tests: `.venv/bin/python -m unittest discover -s tests -v`
+Publisher: set `PUBSUB_EMULATOR_HOST`, then `.venv/bin/python publisher.py`
+Emulator setup/inspection: `.venv/bin/python pubsub_emulator.py setup` / `pull`
+With the emulator configured, the test command includes two real integration tests.
 
 This Auger branch is an application: `app.py` is the Flask boundary and
 `webhook_service/` contains ingress, routing, and SQLite persistence. The reusable

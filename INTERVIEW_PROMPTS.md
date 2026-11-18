@@ -8,7 +8,9 @@ on the provided laptop.
 
 Start with **1**, discuss the problem, then paste **2** if we decide to use this
 design. Paste one feature prompt at a time. The later features are options for
-the remaining time, not a requirement to finish the entire system.
+the remaining time, not a requirement to finish the entire system. After each
+implemented checkpoint, use section 7 to review and understand the actual code
+before selecting the next feature.
 
 ## 1. Opening: establish how we pair
 
@@ -24,7 +26,13 @@ implement everything immediately.
 Work one feature at a time. Before coding, state the expected behavior and the
 smallest useful test. Once I ask you to implement that feature, make the necessary
 edits and run the relevant tests without asking permission for routine steps.
-Show the important code and actual results, then stop at that feature boundary.
+Then pause implementation for a joint code review. Walk me through the actual
+call chain and important functions in small sections, linking files and lines.
+Explain the transaction boundary, failure behavior, and any non-obvious choices.
+Let me inspect and question the code. Evaluate readability and unnecessary
+complexity, and propose stress cases with the expected state after each failure.
+Distinguish cases already tested from new ideas. Discuss findings and test choices
+before fixing them or adding more tests. Wait for me to choose the next checkpoint.
 
 Discuss architecture changes before applying them. Preserve existing work, keep
 the implementation easy to explain, and avoid speculative scaffolding. Do not
@@ -205,10 +213,25 @@ Stop at durable recording. Do not add automatic replay, a dashboard, or a second
 outbox stage. Report any unverified broker/IAM behavior explicitly.
 ```
 
-## 7. Demonstrate and review the current slice
+## 7. After each checkpoint: understand, review, and stress the code
 
 ```text
-Review only the code and behavior implemented so far. Do not add features.
+Pause implementation. Review only the code and behavior implemented so far.
+
+First give me the short call chain with actual file/function links. Walk through
+one successful request and one failure in small sections, using E1, D-A and D-B.
+Show the code that changes each record and the code that decides to retry or
+acknowledge. Explain it at my pace; do not replace the walkthrough with a summary
+of passing tests or a large file dump.
+
+Then evaluate correctness, readability, responsibilities, and unnecessary
+complexity. Present concrete findings with code evidence and distinguish bugs
+from deliberate tradeoffs. This is your self-review, not an independent review.
+
+Propose a short list of stress cases, their expected durable outcomes, and which
+existing tests cover them. Include crashes, ambiguous network outcomes, duplicate
+work, concurrent callers, and slow dependencies where relevant. Discuss which
+case we should test next before writing tests or fixing findings.
 
 Run the relevant checks and show a reproducible demonstration using a request
 generator or small script. Assert database and receiver outcomes, not just logs.
@@ -220,6 +243,7 @@ Report concrete findings first. Then summarize the acceptance boundary, duplicat
 window, ordering guarantee, untrusted-destination protections, tests actually run,
 and the most important deferred feature. Identify fake-based tests separately
 from emulator/HTTP evidence. Do not describe planned components as implemented.
+Wait for me to select the next implementation checkpoint.
 ```
 
 ## Recovery: the agent is getting ahead of me

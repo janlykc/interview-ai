@@ -1,8 +1,9 @@
 # Webhook delivery design
 
 Agreed V1 for the 60-minute [Auger session](../PROBLEM.md). The ingress checkpoint
-is implemented: Flask HTTP receipt, seeded routing, and atomic SQLite acceptance.
-Publication, HTTP dispatch, and DLQ handling remain planned. Numerical limits below
+is implemented: Flask HTTP receipt, seeded routing, atomic SQLite acceptance,
+and outbox publication through the official Pub/Sub emulator. HTTP dispatch and
+DLQ handling remain planned. Numerical limits below
 are configurable starting assumptions. See [running instructions](../README.md).
 
 ## Agreed V1 flow
@@ -10,9 +11,9 @@ are configurable starting assumptions. See [running instructions](../README.md).
 ![Left-to-right webhook architecture: callers, ingress, SQLite outbox, publisher, Pub/Sub queue, dispatch worker pool, and customer endpoints. Policy is shown as a database beside ingress.](component-architecture.svg)
 
 The internal producer and customer-controlled webhook endpoints are outside the
-delivery-service boundary. The implemented feature is Flask ingress, seeded
-routing, and atomic persistence of Event + Deliveries + Outbox. The other boxes
-show the agreed target design, not currently running services. Ingress creates
+delivery-service boundary. Implemented features include Flask ingress, seeded
+routing, atomic persistence of Event + Deliveries + Outbox, and the periodic
+publisher. Worker and DLQ boxes show the target design. Ingress creates
 pending delivery records; the publisher updates outbox publication state; delivery
 workers update HTTP outcomes; the DLQ recorder saves exhausted delivery state.
 Signing keys are resolved only by the future worker. Registration/policy CRUD and
@@ -96,6 +97,11 @@ that confirmation. A failed or ambiguous publish leaves recoverable work and can
 move `next_publish_at` forward. A broker acceptance followed by a failed database
 update can cause duplicate publication. Enforce one outbox entry per delivery,
 with independent progress for A and B.
+
+The local publisher polls once per second and schedules publication failures
+five seconds later. The Google adapter uses one synchronous publish RPC per row,
+a five-second deadline, and no SDK retry loop. An emulator-only inspection
+subscription confirms A and B envelopes without performing HTTP delivery.
 
 The minimal V1 outbox has no durable in-flight publication state. After a publisher
 crash, its row remains unpublished and is eligible for another attempt. Concurrent

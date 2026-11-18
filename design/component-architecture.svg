@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="735" viewBox="0 0 1600 735" role="img" aria-labelledby="title desc">
 <title id="title">Webhook delivery from left to right</title>
-<desc id="desc">Callers submit events to the leftmost service, Flask ingress. Ingress looks up a policy database and atomically commits events, pending deliveries, and outbox rows in SQLite. A periodic outbox publisher reads due rows and publishes one message per delivery to Google Pub/Sub. A shared subscription distributes messages among multiple dispatch workers, which sign each attempt and POST to customer endpoints. Pub/Sub retries unresolved messages and forwards exhausted work to a dead-letter topic and failure recorder. Workers and the failure recorder update delivery outcomes. Ingress and SQLite are implemented; policy is seeded; publishing, dispatch, and dead-letter processing are planned.</desc>
+<desc id="desc">Callers submit events to the leftmost service, Flask ingress. Ingress looks up a policy database and atomically commits events, pending deliveries, and outbox rows in SQLite. A periodic outbox publisher reads due rows and publishes one message per delivery to Google Pub/Sub. A shared subscription distributes messages among multiple dispatch workers, which sign each attempt and POST to customer endpoints. Pub/Sub retries unresolved messages and forwards exhausted work to a dead-letter topic and failure recorder. Workers and the failure recorder update delivery outcomes. Ingress, SQLite, outbox publication and emulator integration are implemented; policy is seeded; HTTP dispatch and dead-letter processing are planned.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#385675"/></marker>
   <marker id="state-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#13786d"/></marker>
@@ -49,7 +49,7 @@
 
 <path d="M575 340 H635" class="line"/>
 <text x="605" y="325" class="edge" text-anchor="middle">Read due</text>
-<rect x="635" y="285" width="170" height="110" rx="10" class="planned"/>
+<rect x="635" y="285" width="170" height="110" rx="10" class="built"/>
 <text x="650" y="318" class="body" font-weight="700">Outbox publisher</text>
 <text x="650" y="346" class="small">Publish each delivery</text>
 <text x="650" y="372" class="small">Then mark published</text>
@@ -61,7 +61,7 @@
 
 <!-- A message queue symbol, not another service box. -->
 <text x="965" y="286" class="head" text-anchor="middle">Google Pub/Sub</text>
-<rect x="865" y="310" width="200" height="60" rx="12" fill="#eef3f8" stroke="#6b89b9" stroke-width="2"/>
+<rect x="865" y="310" width="200" height="60" rx="12" fill="#e8efff" stroke="#6b89b9" stroke-width="2"/>
 <rect x="879" y="322" width="22" height="36" rx="3" fill="#cad9f2"/>
 <rect x="910" y="322" width="22" height="36" rx="3" fill="#cad9f2"/>
 <rect x="941" y="322" width="22" height="36" rx="3" fill="#cad9f2"/>

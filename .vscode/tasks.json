@@ -22,6 +22,18 @@
       },
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
       "problemMatcher": []
+    },
+    {
+      "label": "Webhook: Run outbox publisher",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["publisher.py"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": { "PUBSUB_EMULATOR_HOST": "127.0.0.1:8085" }
+      },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
     }
   ]
 }

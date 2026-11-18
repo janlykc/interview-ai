@@ -1,9 +1,9 @@
 # Delivery architecture walkthrough
 
 Implementation outline supporting the [agreed V1 specification](spec.md). The
-current checkpoint is implemented Flask ingress with seeded routing and atomic SQLite
-acceptance. Service and local HTTP tests cover duplicates, concurrent receipt,
-policy failure, and partial-write rollback. Publication and dispatch remain planned.
+current checkpoint includes Flask ingress, seeded routing, atomic SQLite acceptance,
+and periodic outbox publication verified against the official Pub/Sub emulator.
+HTTP dispatch and DLQ handling remain planned.
 The lead owns these notes.
 
 Ingress checkpoint verification: 16 tests pass using Flask's test client and
@@ -12,7 +12,13 @@ smoke test submitted E1, restarted the
 server against the same SQLite file, and confirmed the same delivery IDs, one
 event, two pending deliveries, and two unpublished outbox rows. Partial outbox
 write failure rolls back acceptance. This is lead self-review and local testing;
-Pub/Sub and end-to-end customer delivery have not been exercised yet.
+Publisher checkpoint verification adds nine unit tests and two real emulator
+integration tests, for 27 passing tests with the emulator configured. The tests
+cover independent publication, retry timing, ambiguous acceptance, a failed
+publication-state commit, real HTTP ingress to A/B broker envelopes, and recovery
+after creating a missing topic. A separate CLI demo observed A and B messages and
+confirmed that Deliveries remain pending while their Outbox rows are published.
+End-to-end customer HTTP delivery has not been exercised yet.
 
 ## Interview sequence from the supplied problem
 
@@ -359,8 +365,9 @@ The supplied interview laptop's runtime prerequisites still need checking.
 Use a local project identifier such as `auger-webhooks-local` and set
 `PUBSUB_EMULATOR_HOST` explicitly for the E2E process. Bootstrap topics and
 subscriptions through the client API. On this machine Docker is available, while
-the host Pub/Sub emulator component and Java runtime are absent. A Docker-based
-emulator is the proposed setup route. Configure a reachable push URL between the
+the Docker image pull hit a local storage I/O error. The host Pub/Sub emulator
+component was installed and verified using a task-local Java 21 runtime instead.
+Both routes run the official emulator. Configure a reachable push URL between the
 emulator container and the local workers, then verify readiness before tests.
 
 The emulator supports push and pull, retry policies, and dead-letter forwarding.

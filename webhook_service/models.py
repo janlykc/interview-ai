@@ -36,6 +36,10 @@ class StorageUnavailable(IngressError):
     code = "storage_unavailable"
 
 
+class PublishUnavailable(Exception):
+    """Broker acceptance failed or could not be confirmed before the deadline."""
+
+
 def encode_json(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
@@ -122,6 +126,20 @@ class Delivery:
     delivery_id: str
     endpoint: Endpoint
     message_json: str
+
+
+@dataclass(frozen=True)
+class OutboxEntry:
+    delivery_id: str
+    message_json: str
+    next_publish_at: int
+    published_at: int | None = None
+
+
+@dataclass(frozen=True)
+class PublishBatchResult:
+    published: int = 0
+    failed: int = 0
 
 
 @dataclass(frozen=True)
