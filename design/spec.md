@@ -6,6 +6,10 @@ and outbox publication through the official Pub/Sub emulator. HTTP dispatch and
 DLQ handling remain planned. Numerical limits below
 are configurable starting assumptions. See [running instructions](../README.md).
 
+The ordering extension below is an agreed design update. The running checkpoint
+still has the original four-field outbox and unordered publication; no schema
+migration or ordered-subscription change has been applied.
+
 ## Agreed V1 flow
 
 ![Left-to-right webhook architecture: callers, ingress, SQLite outbox, publisher, Pub/Sub queue, dispatch worker pool, and customer endpoints. Policy is shown as a database beside ingress.](component-architecture.svg)
@@ -30,7 +34,8 @@ controlled replay remain outside this implementation checkpoint.
    deliveries durably. Controlled replay is a follow-up feature.
 
 V1 has one outbox table and one publication stage. An event selecting A and B
-creates two entries in that table. Each entry can publish independently.
+creates two entries in that table. Each entry has independent publication state;
+the proposed ordering key determines which entries may advance concurrently.
 Acceptance depends on a successful policy lookup. The producer retains the event
 and retries when lookup or commit fails. A separate durable receipt processor is
 a future extension if acceptance must continue while policy lookup is unavailable.
@@ -90,13 +95,16 @@ commit, the producer can safely repeat its event ID.
 the Event and immutable routing snapshot, one Delivery per unique endpoint,
 and one pending Outbox entry per delivery. Partial acceptance rolls back.
 
-`OutboxPublisher.publish_due_batch()` reads due entries whose `published_at` is
-null. The immutable envelope is stored before publication. Each broker publish
+`OutboxPublisher.publish_due_batch()` currently reads due entries whose
+`published_at` is null. The ordering extension instead selects only the earliest
+unpublished row per key, and publishes that row only when due. The immutable
+envelope is stored before publication. Each broker publish
 waits for acceptance within a bounded call deadline. Set `published_at` only after
 that confirmation. A failed or ambiguous publish leaves recoverable work and can
 move `next_publish_at` forward. A broker acceptance followed by a failed database
-update can cause duplicate publication. Enforce one outbox entry per delivery,
-with independent progress for A and B.
+update can cause duplicate publication. Enforce one outbox entry per delivery.
+A and B share progress constraints with a customer key; endpoint-specific keys
+allow them to advance independently.
 
 The local publisher polls once per second and schedules publication failures
 five seconds later. The Google adapter uses one synchronous publish RPC per row,
@@ -106,7 +114,9 @@ subscription confirms A and B envelopes without performing HTTP delivery.
 The minimal V1 outbox has no durable in-flight publication state. After a publisher
 crash, its row remains unpublished and is eligible for another attempt. Concurrent
 publishers can publish duplicates, which the delivery contract already tolerates.
-V1 uses one periodic publisher for simplicity. Failure updates only affect still-
+The ordered extension requires a single active publisher for V1; overlapping
+publishers must not race to publish later rows before earlier ones. Scaling
+publication requires coordinated ownership per key. Failure updates only affect still-
 unpublished rows. Keep outbox message contents immutable.
 
 ### Dispatch and settlement
@@ -230,6 +240,112 @@ Customer C already has endpoints A and B configured. Its policy for
 out, then accepts a later attempt. A's successful delivery stays complete while
 B retries. Another event can be accepted throughout this sequence.
 
+## Ordering: scope, sequence, and native Pub/Sub behavior
+
+**Default interview tradeoff: use `customer_id` as the ordering key.** All queued
+deliveries for that customer form one ordered stream. If independent throughput
+across its endpoints is needed, use `customer_id:endpoint_id` instead. Use stable
+IDs and an unambiguous encoding; freeze the chosen key on each accepted outbox row.
+
+| Key | Ordering scope | Consequence |
+| --- | --- | --- |
+| `C1` | All C1 deliveries | A failed A delivery also holds later B deliveries for C1 |
+| `C1:A`, `C1:B` | Each endpoint within C1 | A and B can progress concurrently; each endpoint remains ordered |
+
+Different keys can progress concurrently through the shared worker pool. With an
+ordered push subscription, Pub/Sub permits one outstanding message per key. The
+key does not reserve a dedicated worker or create a separate physical queue.
+Set the native `PubsubMessage.ordering_key`, enable ordering when creating the
+subscription, and publish each key through one region. Pub/Sub preserves the
+order in which it receives publications for that key; it does not sort our
+`sequence_number` field. [Pub/Sub ordering](https://docs.cloud.google.com/pubsub/docs/ordering)
+
+### Generate sequence numbers in SQLite
+
+Use one **database-wide** `INTEGER PRIMARY KEY AUTOINCREMENT` on the outbox.
+Contiguous per-customer numbers are unnecessary. For example:
+
+| Global sequence | Key | Delivery |
+| --- | --- | --- |
+| 1 | C1 | E1 → A |
+| 2 | C1 | E1 → B |
+| 3 | C2 | Another customer's delivery |
+| 4 | C1 | E2 → A |
+| 5 | C1 | E2 → B |
+
+C1's order is 1, 2, 4, 5. Gaps have no meaning. No per-customer counter table is
+needed. SQLite assigns the number when ingress inserts each outbox row, omitting
+`sequence_number`, inside the existing `BEGIN IMMEDIATE` acceptance transaction.
+SQLite serializes writers. Insert an event's endpoint deliveries in a stable order
+(such as endpoint ID), finish all its outbox inserts, then commit. Concurrent event
+acceptance therefore establishes a durable acceptance order. Producer `occurred_at`
+and HTTP receipt timestamps remain metadata, not the ordering authority.
+
+Check duplicate event acceptance before allocating new rows. A repeated accepted
+event reuses its original delivery IDs, keys, and sequence numbers. A rolled-back
+transaction leaves no accepted publication intent; its uncommitted numbers may be
+reused. `AUTOINCREMENT` prevents reuse of committed row IDs after outbox cleanup.
+Retain SQLite's internal sequence state. [SQLite AUTOINCREMENT](https://www.sqlite.org/autoinc.html)
+
+### Publish the head of each stream
+
+Select the lowest unpublished sequence for each key, then test its due time. An
+earlier unpublished row blocks later rows even when its own retry time is in the
+future. Never filter out delayed predecessors before deciding which row is first.
+
+```sql
+SELECT candidate.*
+FROM outbox AS candidate
+WHERE candidate.published_at IS NULL
+  AND candidate.next_publish_at <= :now
+  AND NOT EXISTS (
+      SELECT 1 FROM outbox AS earlier
+      WHERE earlier.ordering_key = candidate.ordering_key
+        AND earlier.published_at IS NULL
+        AND earlier.sequence_number < candidate.sequence_number
+  )
+ORDER BY candidate.next_publish_at, candidate.sequence_number
+LIMIT :batch_size;
+```
+
+Publish each selected row with its saved native ordering key and wait for broker
+acceptance before marking it published. Re-query stream heads after success to
+advance that key. A failed or ambiguous publish retains the same row, sequence,
+and key and delays its retry; other eligible keys can advance. Keep the existing
+bounded calls and batch budget, and hold no database transaction across a publish.
+
+### HTTP retries, completion, and boundaries
+
+E2 can already be published while E1 is being dispatched. Pub/Sub gates delivery
+to the worker by key, while the outbox gates publication order. Save the HTTP
+outcome before acknowledging. A retry response holds later messages for that key.
+The existing terminal-failure policy acknowledges recorded permanent failures;
+native dead-letter forwarding can also allow progress with a failure gap. Ordered
+attempts do not promise that every earlier event succeeded. DLQ forwarding is
+best effort and does not preserve a complete ordered history.
+
+Duplicate publication and redelivery remain possible. Keep delivery deduplication
+and leases, and do not infer the receiver's business-effect order from a timeout.
+Customer-wide ordering limits outstanding messages for that key; admission limits,
+backlog limits, and stronger isolation are separate concerns. Switching key scope
+requires a deliberate cutover after draining old work, since the new key has no
+ordering relationship with the old one.
+
+### Implementation and verification still needed
+
+The code still uses the original unordered schema and subscription. Implement the
+proposed schema, insert-time sequence allocation, head-of-stream query, native
+publication key, and a newly created ordering-enabled subscription together.
+Existing timestamp-only rows cannot prove an acceptance sequence for tied times;
+use a fresh rehearsal database or an explicit legacy-backlog cutover rather than
+inventing a historical ordering guarantee.
+
+Verify concurrent acceptance, duplicate receipt reusing sequence numbers, and
+rollback. Test that C1's delayed first row blocks its later rows while C2 advances;
+then test the endpoint-key alternative. Exercise retries and duplicates through
+the real ordering-enabled broker subscription, and qualify cloud behavior
+separately from emulator behavior. Existing passing tests do not establish ordering.
+
 ## Models
 
 ### Endpoint supplied by the registration system
@@ -310,7 +426,9 @@ increments its generation and preserves the history.
 
 | Field | Meaning |
 | --- | --- |
-| `delivery_id` | Primary key and link to the delivery record |
+| `sequence_number` | Proposed global SQLite-generated primary key; only relative order within a key matters |
+| `delivery_id` | Unique foreign key to the delivery record; preserves the 1:1 mapping |
+| `ordering_key` | Repeated stream identifier: customer by default, optionally customer + endpoint |
 | `message_json` | Serialized dispatch envelope containing destination, exact body, and signing secret reference |
 | `next_publish_at` | Next due time for publishing an unpublished row |
 | `published_at` | Broker acceptance observed by the publisher |
@@ -319,7 +437,9 @@ increments its generation and preserves the history.
 
 The local database can be a file such as `var/webhooks.db`, shared by the local
 ingress, publisher, and dispatcher processes. Events, deliveries, and outbox rows
-are stored in that same database. This is a proposed schema for the local V1.
+are stored in that same database. This six-field schema is the proposed ordering
+extension, not the currently executed four-field schema in
+`webhook_service/adapters/schema.sql`. No separate sequence-counter table is needed.
 All database timestamps below are UTC Unix milliseconds, supplied by the application.
 The webhook signature timestamp uses Unix seconds as specified separately.
 
@@ -327,32 +447,42 @@ The webhook signature timestamp uses Unix seconds as specified separately.
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE outbox (
-    delivery_id      TEXT PRIMARY KEY NOT NULL REFERENCES deliveries(delivery_id),
-    message_json     TEXT NOT NULL,
-    next_publish_at  INTEGER NOT NULL,
-    published_at     INTEGER
+    sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
+    delivery_id     TEXT NOT NULL UNIQUE REFERENCES deliveries(delivery_id),
+    ordering_key    TEXT NOT NULL CHECK (length(ordering_key) > 0),
+    message_json    TEXT NOT NULL,
+    next_publish_at INTEGER NOT NULL,
+    published_at    INTEGER
 );
 
 CREATE INDEX outbox_due_idx
     ON outbox (next_publish_at)
     WHERE published_at IS NULL;
+
+CREATE INDEX outbox_unpublished_order_idx
+    ON outbox (ordering_key, sequence_number)
+    WHERE published_at IS NULL;
 ```
 
 Enable foreign-key enforcement on each SQLite connection. Insert each pending row
 inside the event/delivery acceptance transaction. A null `published_at` means
-pending. Read due rows, publish, then conditionally set `published_at`. Failed
+pending. Read due stream heads, publish, then conditionally set `published_at`. Failed
 publication schedules the next due time while leaving `published_at` null.
 Observe publication failures in safe logs and use Delivery creation time when
 inspecting oldest pending work. Publication leases, separate status, attempt
 counters, outbox audit timestamps, and generation-specific entries can be added
 when later features need them. The Delivery's lease still coordinates actual HTTP
-dispatch. The publisher is configured with the delivery topic. `message_json`
+dispatch. Global sequence uniqueness already makes each `(ordering_key,
+sequence_number)` pair unique, so another uniqueness constraint on that pair is
+unnecessary. `ordering_key` alone is not unique. The publisher is configured with
+the delivery topic. `message_json`
 carries a secret reference, and the dispatcher creates the HMAC at send time.
 
 Ingress atomically writes the Event, frozen routing snapshot, all Deliveries,
-and one pending Outbox entry per destination. The publisher independently sends
-each committed envelope to `webhook-deliveries`. If A publishes and B fails,
-B's outbox entry remains recoverable. The first slice assumes a bounded
+and one pending Outbox entry per destination. The publisher sends each committed
+envelope to `webhook-deliveries` in sequence within its key. If A publishes and B
+fails, B's outbox entry remains recoverable and blocks later entries sharing its
+key. Other keys remain eligible. The first slice assumes a bounded
 destination set. Large fan-out needs paginated, resumable materialization as a
 future extension. Signing-key references are independent of outbox stage count.
 
@@ -362,9 +492,18 @@ Each delivery-topic Pub/Sub message contains a dispatch envelope with these fiel
 schema_version
 delivery_id, event_id, customer_id, replay_generation
 endpoint_id, endpoint_version, url
+ordering_key: <ordering-extension metadata; not in today's code>
 body: <exact outbound UTF-8 JSON bytes represented as a JSON string>
 signing_secret_ref: <reference supplied by the configuration system>
 ```
+
+For the extension, store the key in the immutable dispatch envelope as well as
+the outbox column, and cover it with the accepted fingerprint. The sequence is
+generated by the outbox INSERT and stays in that row; it need not be embedded
+in `message_json` or sent to the receiver.
+Set Pub/Sub's native ordering key from the saved column and validate its binding
+to the envelope. The sequence chooses publication order, not a broker sort field.
+These fields do not alter the exact outbound HTTP body or HMAC signing contract.
 
 The dispatcher validates the envelope against the accepted delivery fingerprint
 and generation, then uses its URL and body. It retrieves the referenced key and
@@ -462,8 +601,9 @@ IAM enforcement. Local test credentials are limited to the rehearsal environment
 
 - Accepted events survive a process restart and a temporary broker outage while
   durable storage remains available. Failed database commits receive an error.
-- The broker may deliver a message repeatedly or out of order. Our consumers
-  tolerate repeated publications and concurrent invocations.
+- The running checkpoint permits unordered messages. The proposed extension orders
+  publication and ordered push delivery within the selected key. Duplicates and
+  redelivery still require idempotent consumers and delivery-state coordination.
 - Each delivery progresses independently in application state. Shared broker and
   worker capacity still affect throughput. Strict customer isolation requires
   additional queue partitioning and distributed capacity controls.
@@ -471,8 +611,9 @@ IAM enforcement. Local test credentials are limited to the rehearsal environment
   policy. Permanent failures and exhausted deliveries remain inspectable.
 - A receiver can process a POST before our worker loses the response or crashes.
   Retries carry the same delivery ID so the receiver can deduplicate effects.
-- The proposed first slice permits out-of-order delivery. Per-endpoint ordering
-  is an open product decision because an earlier failure can block later events.
+- The ordering design defaults to customer-wide serialization. Customer + endpoint
+  keys are the explicit alternative for independent endpoint throughput. A failure
+  can block later work within either selected scope.
 
 ## Slow, flaky, and unavailable endpoints
 
@@ -578,7 +719,8 @@ abuse of third-party URLs, subject to the registration contract we choose.
 
 ## Open choices
 
-- Is unordered delivery acceptable, and what retry deadline should customers get?
+- What retry deadline should customers get? Customer-level ordering is the starting
+  design; choose endpoint-level keys if independent endpoint progress is required.
 - Routing is resolved at ingress and frozen with successful acceptance. The
   external registration snapshot's consistency contract remains an integration
   detail to qualify.
@@ -598,7 +740,9 @@ abuse of third-party URLs, subject to the registration contract we choose.
 
 The one-outbox flow, producer boundary, external configuration ownership, Pub/Sub
 emulator E2E path, and send-time HMAC signing are agreed. The API shapes above
-make those boundaries concrete for review. SQLite, unordered delivery, the
-customer retry deadline, and numerical timing limits remain proposed choices.
+make those boundaries concrete for review. SQLite ingress and unordered publication
+are implemented. The ordered schema and native Pub/Sub ordering are designed but
+not implemented; the customer retry deadline and numerical limits remain proposed.
 The two-stage receipt alternative is retained as an extension for acceptance
-during policy outages. Application implementation and execution evidence are pending.
+during policy outages. HTTP dispatch, DLQ handling, and their execution evidence
+remain pending.

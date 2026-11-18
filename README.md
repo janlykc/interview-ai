@@ -132,6 +132,12 @@ client RPC with a five-second deadline and SDK retries disabled. Publication
 changes only the outbox's `published_at`; deliveries remain `pending` with zero
 HTTP attempts. A crash after broker acceptance can cause duplicate publication.
 
+The running publisher and executable schema still use the original four-field,
+unordered outbox. The [ordering design](design/spec.md#ordering-scope-sequence-and-native-pubsub-behavior)
+proposes a six-field outbox with a global SQLite sequence and a saved Pub/Sub
+ordering key. That extension has not been migrated or implemented, and the
+current emulator tests do not establish ordered delivery.
+
 Ingress and publisher must use the same database. Set `WEBHOOK_DB_PATH` for both,
 or pass `--db` to the publisher. For example, use `var/pubsub-demo.db` for an isolated
 rehearsal. Repeating E1 reuses existing work; change its `event_id` to E2 when you

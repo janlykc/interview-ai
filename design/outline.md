@@ -4,6 +4,9 @@ Implementation outline supporting the [agreed V1 specification](spec.md). The
 current checkpoint includes Flask ingress, seeded routing, atomic SQLite acceptance,
 and periodic outbox publication verified against the official Pub/Sub emulator.
 HTTP dispatch and DLQ handling remain planned.
+The [ordering extension](spec.md#ordering-scope-sequence-and-native-pubsub-behavior)
+adds a global SQLite-generated outbox sequence and a saved Pub/Sub ordering key.
+It is designed but not implemented in the current checkpoint.
 The lead owns these notes.
 
 Ingress checkpoint verification: 16 tests pass using Flask's test client and
@@ -34,8 +37,9 @@ and interviewer can help refine the design as it develops.
    success for A and retryable work for B should be represented separately.
 3. State the proposed contract. Accept after durable commit, retry each endpoint
    independently, permit duplicate HTTP requests with stable delivery IDs, and
-   propose unordered delivery for the first slice. Ask the interviewer whether
-   ordering or a particular retry window changes the problem.
+   propose customer-key ordering. Explain that customer + endpoint keys allow
+   independent endpoint progress. The existing running checkpoint is unordered;
+   implementing the ordering contract is a separate checkpoint.
 4. Agree the boundary. Seed two existing registrations and the event mapping.
    The producer retains and retries events before acceptance. Registration and
    policy CRUD belong to the external configuration system. This makes delivery
@@ -46,7 +50,7 @@ and interviewer can help refine the design as it develops.
    and report environment failures separately from application failures.
 6. Ask what happens if the database commit succeeds and publishing fails. Use
    that failure to justify the transactional outbox. Commit Event + Deliveries +
-   one Outbox entry per endpoint, then publish each independently. State the
+   one Outbox entry per endpoint, then publish in sequence within its key. State the
    policy-availability tradeoff of doing lookup during ingress.
 7. Sketch signing and untrusted destination boundaries. Use an endpoint secret
    reference, sign each attempt at send time, set a total deadline, and disable
@@ -124,8 +128,8 @@ Outbox writing belongs to the transaction that creates the work. The periodic
 publisher is the independently invoked recovery component. These modules share
 transactional storage in the first runnable slice.
 
-V1 uses one outbox stage. There is one independently publishable entry for each
-delivery. Source-event retention and retries before acceptance belong to the
+V1 uses one outbox stage. There is one entry for each delivery; the proposed key
+scope determines which entries can advance independently. Source-event retention and retries before acceptance belong to the
 producer. Ingress relies on policy availability to complete initial acceptance.
 
 ## Registration and routing
@@ -156,11 +160,22 @@ starts at our commit.
 
 ## Outbox publication
 
-The publisher periodically reads due outbox entries whose `published_at` is null.
+The running publisher reads due outbox entries whose `published_at` is null.
+The ordered extension adds `ordering_key` and a global `sequence_number INTEGER
+PRIMARY KEY AUTOINCREMENT`. Keep `delivery_id` a unique foreign key for the 1:1
+mapping. No per-customer counter table is needed: gaps within a key are harmless.
+Allocate the sequence through the outbox INSERT in the acceptance transaction.
+
+For ordering, select only the earliest unpublished row per key, then check whether
+that head is due. A delayed head blocks later rows sharing the key. Use one active
+publisher, set the native Pub/Sub ordering key, create an ordering-enabled push
+subscription, and keep each key's cloud publication in one region. Default to
+customer keys; customer + endpoint keys enable independent endpoint streams.
+
 After broker acceptance it conditionally sets `published_at`. A failed or
 ambiguous publish leaves retryable work. A crash after publication can cause
 another publish, so dispatch consumers deduplicate by application delivery identity.
-Publisher retries use bounded calls and delayed, jittered scheduling.
+Publisher retries use bounded calls and a fixed five-second delay in the rehearsal.
 The poller itself supplies recovery after restarts.
 
 V1 uses one independently invoked periodic publisher, including during quiet
@@ -450,8 +465,10 @@ configuration. Emulator setup and all E2E cases are pending execution.
   envelope fingerprint. An old replay message must not damage current work.
 - Record started HTTP attempts and allow an unknown crash outcome. Distinguish
   them from Pub/Sub invocation counts and receiver-observed requests.
-- Set a customer retry deadline and decide ordering semantics. The current
-  proposal allows out-of-order delivery and leaves the customer retry window open.
+- Set a customer retry deadline. Implement the proposed ordering contract with
+  delayed-head blocking, duplicate-safe state updates, and native subscription
+  ordering. Existing unordered tests do not verify this extension. Decide whether
+  customer keys or customer + endpoint keys match the required concurrency.
 
 ## Proposed build checkpoints after design discussion
 

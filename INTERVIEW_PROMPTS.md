@@ -55,6 +55,10 @@ Use this as our proposed V1, subject to the interview discussion. Confirm your
 understanding and identify any material conflict with the supplied requirements.
 Do not implement until I select a feature.
 
+The rehearsal code currently has a four-field outbox and unordered publication.
+The ordered design below is the target extension; do not claim it is implemented
+or covered by the existing passing tests.
+
 Stack: Python, Flask, SQLite, and Google Pub/Sub with its official local emulator.
 Keep application logic separate from Flask and inject routing/storage adapters.
 Use seeded endpoint registration and exact customer + category.event_type mapping.
@@ -76,17 +80,33 @@ For E1 targeting A and B, initial state is:
 - events: one accepted E1 with its payload and frozen routing snapshot.
 - deliveries: D-A and D-B, both pending with zero HTTP attempts.
 - outbox: one row per delivery, with delivery_id, message_json,
-  next_publish_at = now, and published_at = NULL.
+  ordering_key, sequence_number, next_publish_at = now, and published_at = NULL.
+
+Default ordering_key is customer_id. Use customer_id:endpoint_id when endpoints
+of the same customer need independent progress. Use a database-wide SQLite
+sequence_number INTEGER PRIMARY KEY AUTOINCREMENT on the outbox. delivery_id is
+a UNIQUE NOT NULL foreign key, preserving one outbox row per delivery. Omit the
+sequence on INSERT so SQLite assigns it inside the acceptance transaction.
+Gaps are fine; no separate per-customer counter table is needed. Keep the key
+and sequence stable across publication retries and duplicate event receipt.
 
 Duplicate (customer_id, event_id) with the same normalized content returns the
 original delivery IDs without rerouting. Conflicting content returns 409.
 A valid empty endpoint set is accepted as no_targets with no delivery work.
 
-The periodic publisher reads due unpublished rows, publishes each envelope, and
+The periodic publisher selects the earliest unpublished row per key and checks
+whether it is due. A delayed predecessor must block later rows for the same key,
+while other keys remain eligible. Use one active publisher in V1. It publishes
+each envelope with its native Pub/Sub ordering key, and
 sets published_at only after Pub/Sub confirms acceptance. Failed or ambiguous
 publication leaves the row unpublished; retry publication after five seconds
 for the simple V1. A crash can cause duplicate publication. Publication does
 not change Delivery status: pending remains pending until a worker claims it.
+Re-query heads after success. Enable ordering when creating the push subscription
+and publish each key through one region. Pub/Sub preserves publication order;
+it does not sort our sequence field. Bind the known ordering key to the immutable
+dispatch envelope/fingerprint. The generated sequence can stay in the outbox;
+neither field changes the outbound HTTP body.
 
 Each queue message contains stable IDs, the resolved endpoint URL and version,
 the exact serialized outbound body, and a signing_secret_ref. Queue secret
@@ -111,12 +131,18 @@ unbounded retry loop inside the HTTP handler.
 Observed 2xx + saved success means delivered. Timeouts can have an unknown
 receiver outcome. Duplicate HTTP calls remain possible, so stable delivery IDs
 support recipient deduplication. Offer at-least-once attempts within a bounded
-retry/retention window, unordered delivery, and no exactly-once claim.
+retry/retention window, ordered attempts within the selected key, and no
+exactly-once or receiver business-effect ordering claim. Native ordered push has
+one outstanding message per key. Customer-wide ordering can therefore hold B
+while A retries; endpoint-specific keys allow A/B to progress independently.
+Recorded permanent failures and native DLQ forwarding can permit progress with
+a failure gap; ordering does not require every earlier event to succeed.
 
 Pub/Sub forwards exhausted work to a dead-letter topic. Its handler durably
 records failure before ACK, preserves an already successful delivery, and keeps
 malformed/unmatched messages diagnostic rather than sending them as webhooks.
-Controlled replay is a later feature, not resetting the four-field V1 outbox.
+Controlled replay is a later feature; it requires its own generation-aware
+publication identity and stale-completion protection.
 
 Treat destinations as untrusted: HTTPS, no redirects, bounded time/body sizes,
 and connection-time destination restrictions. Local HTTP receiver fixtures need
@@ -154,12 +180,17 @@ do not add a publisher or delivery worker yet.
 
 ```text
 Implement only outbox publication and the local Pub/Sub emulator setup.
-Preserve the existing ingress transaction and four-field outbox contract.
+Preserve the existing ingress transaction and one-outbox contract. If this is the
+ordering checkpoint, apply the proposed six-field schema and sequence allocation
+together with publisher and subscription changes; do not partially enable ordering.
 
-Add one periodic publisher that reads due unpublished rows, publishes one full
+Add one periodic publisher that reads due unpublished stream heads, publishes one full
 delivery envelope per row, and marks published_at only after broker acceptance.
 On failure, leave it unpublished and set next_publish_at = now + five seconds.
 Do not mark Delivery succeeded or add another outbox stage.
+Test that a delayed earlier row blocks later rows with the same ordering key,
+while another key can progress. Pass the native key and enable subscription
+ordering; application sequence numbers are not a Pub/Sub sorting option.
 
 Test failed publication and ambiguous acceptance, including the crash window
 after broker acceptance but before the database update. Duplicate publication
